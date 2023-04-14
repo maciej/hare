@@ -26,6 +26,7 @@ func start(cCtx *cli.Context) error {
 	mux := chi.NewMux()
 
 	mux.Get("/headers", headersHandler)
+	mux.Get("/set-cookie", setCookieHandler)
 
 	fmt.Printf("HARE starting. Listening on %s\n", cCtx.String("addr"))
 
@@ -35,6 +36,13 @@ func start(cCtx *cli.Context) error {
 	}
 
 	return nil
+}
+
+func setCookieHandler(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{Name: "HARE-Hello", Value: "1", MaxAge: 3600})
+	w.Header().Set("content-type", "text/plain")
+
+	_, _ = fmt.Fprintln(w, "OK")
 }
 
 func headersHandler(w http.ResponseWriter, r *http.Request) {
