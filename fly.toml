@@ -1,0 +1,22 @@
+# fly.toml file generated for hare on 2023-04-17T11:42:27+02:00
+
+app = "hare"
+primary_region = "waw"
+
+[build]
+  builder = "paketobuildpacks/builder:base"
+  buildpacks = ["gcr.io/paketo-buildpacks/go"]
+
+[env]
+  HARE_ADDR = ":8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+[checks]
+  [checks.alive]
+    type = "tcp"
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "5s"
