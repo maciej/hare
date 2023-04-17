@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 
@@ -14,7 +15,7 @@ func main() {
 	app := &cli.App{
 		Name: "hare",
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "addr", Usage: "Address to listen on", Value: "localhost:3200"},
+			&cli.StringFlag{Name: "addr", Usage: "Address to listen on", Value: "localhost:3200", EnvVars: []string{"HARE_ADDR"}},
 		},
 		Action: start,
 	}
@@ -23,19 +24,31 @@ func main() {
 }
 
 func start(cCtx *cli.Context) error {
+	addr := cCtx.String("addr")
+
 	mux := chi.NewMux()
 
 	mux.Get("/headers", headersHandler)
 	mux.Get("/set-cookie", setCookieHandler)
+	mux.Get("/hello", helloHandler)
+	mux.Post("/body", bodyHandler)
 
-	fmt.Printf("HARE starting. Listening on %s\n", cCtx.String("addr"))
+	fmt.Printf("HARE starting. Listening on %s\n", addr)
 
-	err := http.ListenAndServe(cCtx.String("addr"), mux)
+	err := http.ListenAndServe(addr, mux)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error on shutdown: %s\n", err)
 	}
 
 	return nil
+}
+
+func bodyHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = io.Copy(w, r.Body)
+}
+
+func helloHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = fmt.Fprintln(w, "Hello")
 }
 
 func setCookieHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,9 +59,26 @@ func setCookieHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func headersHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
+	var renderJSON bool
 
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	_ = enc.Encode(r.Header)
+	switch r.Header.Get("accept") {
+	case "text/plain":
+		renderJSON = false
+	case "application/json", "text/json":
+		renderJSON = true
+	default:
+		renderJSON = false
+	}
+
+	if !renderJSON {
+		w.Header().Set("content-type", "text/plain")
+		_ = r.Header.Write(w)
+	} else {
+		w.Header().Set("content-type", "application/json")
+
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(r.Header)
+	}
+
 }
