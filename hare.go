@@ -95,7 +95,13 @@ func (mi *muxIndexer) indexHandler(w http.ResponseWriter, r *http.Request) {
 
 	wb := bytes.NewBuffer(nil)
 
+	_, _ = fmt.Fprintln(wb, "<!DOCTYPE html>")
 	_, _ = fmt.Fprintln(wb, "<html>")
+
+	_, _ = fmt.Fprintln(wb, "<head>")
+	_, _ = fmt.Fprintln(wb, `<link rel="icon" type="image/x-icon" href="/favicon.ico">`)
+	_, _ = fmt.Fprintln(wb, "</head>")
+
 	_, _ = fmt.Fprintln(wb, "<body>")
 	_, _ = fmt.Fprintln(wb, "<ul>")
 
