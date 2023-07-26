@@ -2,9 +2,12 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
@@ -43,6 +46,7 @@ func main() {
 func start(cCtx *cli.Context) error {
 	mux := chi.NewMux()
 
+	mux.Get("/", (&muxIndexer{mux}).indexHandler)
 	mux.Get("/headers", headersHandler)
 	mux.Get("/set-cookie", setCookieHandler)
 	mux.Get("/hello", helloHandler)
@@ -60,6 +64,50 @@ func start(cCtx *cli.Context) error {
 	}
 
 	return nil
+}
+
+type muxIndexer struct {
+	*chi.Mux
+}
+
+func (mi *muxIndexer) indexHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "text/html")
+
+	wb := bytes.NewBuffer(nil)
+
+	_, _ = fmt.Fprintln(wb, "<html>")
+	_, _ = fmt.Fprintln(wb, "<body>")
+	_, _ = fmt.Fprintln(wb, "<ul>")
+
+	_ = chi.Walk(mi.Mux, func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		if method == http.MethodGet {
+			_, _ = fmt.Fprintf(wb, "<li>%s <a href=\"%s\">%s</a></li>", method, html.EscapeString(route), route)
+		} else {
+			_, _ = fmt.Fprintf(wb, "<li>%s %s</li>", method, route)
+		}
+
+		return nil
+	})
+
+	_, _ = fmt.Fprintln(wb, "</ul>")
+	_, _ = fmt.Fprintln(wb, "</body>")
+	_, _ = fmt.Fprintln(wb, "</html>")
+
+	// TODO extract etag support to middleware
+	etag := genEtag(wb.Bytes())
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	w.Header().Set("ETag", genEtag(wb.Bytes()))
+
+	_, _ = io.Copy(w, wb)
+}
+
+func genEtag(buf []byte) string {
+	sum := sha1.Sum(buf)
+	return base64.URLEncoding.EncodeToString(sum[:])
 }
 
 func routeHandler(w http.ResponseWriter, r *http.Request) {
