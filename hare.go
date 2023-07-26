@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/urfave/cli/v2"
@@ -51,6 +53,24 @@ func start(cCtx *cli.Context) error {
 	mux.Get("/set-cookie", setCookieHandler)
 	mux.Get("/hello", helloHandler)
 	mux.Post("/body", bodyHandler)
+
+	if err := fs.WalkDir(staticFS, "static", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		woPrefix := strings.TrimPrefix(path, "static")
+
+		mux.Get(woPrefix, func(w http.ResponseWriter, r *http.Request) {
+			serveStatic(w, r, woPrefix)
+		})
+		return nil
+	}); err != nil {
+		return err
+	}
 
 	if routeEnabled {
 		mux.Get("/route", routeHandler)
