@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hare/middleware"
 	"html"
 	"io"
 	"io/fs"
@@ -14,6 +13,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"hare/middleware"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/urfave/cli/v2"
@@ -52,6 +53,7 @@ func start(cCtx *cli.Context) error {
 	mux.Get("/set-cookie", setCookieHandler)
 	mux.Get("/hello", helloHandler)
 	mux.Post("/body", bodyHandler)
+	mux.Get("/query", queryHandler)
 
 	if err := fs.WalkDir(staticFS, "static", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -204,7 +206,6 @@ func setCookieHandler(w http.ResponseWriter, r *http.Request) {
 
 func headersHandler(w http.ResponseWriter, r *http.Request) {
 	var renderJSON bool
-
 	switch r.Header.Get("accept") {
 	case "text/plain":
 		renderJSON = false
@@ -224,5 +225,10 @@ func headersHandler(w http.ResponseWriter, r *http.Request) {
 		enc.SetIndent("", "  ")
 		_ = enc.Encode(r.Header)
 	}
+}
 
+func queryHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "text/plain")
+
+	_, _ = fmt.Fprintf(w, "%s\n", r.URL.RawQuery)
 }
