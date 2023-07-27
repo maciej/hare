@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"hare/middleware"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -21,5 +22,17 @@ func serveStatic(w http.ResponseWriter, r *http.Request, file string) {
 		return
 	}
 
-	http.ServeContent(w, r, file, staticModTime, f.(io.ReadSeeker))
+	rs := f.(io.ReadSeeker)
+
+	etag, err := middleware.GenEtagFromReader(rs)
+	if err == nil { // set ETag if possible
+		w.Header().Set("Etag", etag)
+	}
+
+	if _, err := rs.Seek(0, io.SeekStart); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.ServeContent(w, r, file, staticModTime, rs)
 }

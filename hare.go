@@ -2,11 +2,10 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha1"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hare/middleware"
 	"html"
 	"io"
 	"io/fs"
@@ -48,7 +47,7 @@ func main() {
 func start(cCtx *cli.Context) error {
 	mux := chi.NewMux()
 
-	mux.Get("/", (&muxIndexer{mux}).indexHandler)
+	mux.With(middleware.BodyEtag).Get("/", (&muxIndexer{mux}).indexHandler)
 	mux.Get("/headers", headersHandler)
 	mux.Get("/set-cookie", setCookieHandler)
 	mux.Get("/hello", helloHandler)
@@ -93,47 +92,30 @@ type muxIndexer struct {
 func (mi *muxIndexer) indexHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "text/html")
 
-	wb := bytes.NewBuffer(nil)
+	_, _ = fmt.Fprintln(w, "<!DOCTYPE html>")
+	_, _ = fmt.Fprintln(w, "<html>")
 
-	_, _ = fmt.Fprintln(wb, "<!DOCTYPE html>")
-	_, _ = fmt.Fprintln(wb, "<html>")
+	_, _ = fmt.Fprintln(w, "<head>")
+	_, _ = fmt.Fprintln(w, `<link rel="icon" type="image/x-icon" href="/favicon.ico">`)
+	_, _ = fmt.Fprintln(w, `<link rel="apple-touch-icon" href="/apple-touch-icon.png">`)
+	_, _ = fmt.Fprintln(w, "</head>")
 
-	_, _ = fmt.Fprintln(wb, "<head>")
-	_, _ = fmt.Fprintln(wb, `<link rel="icon" type="image/x-icon" href="/favicon.ico">`)
-	_, _ = fmt.Fprintln(wb, "</head>")
-
-	_, _ = fmt.Fprintln(wb, "<body>")
-	_, _ = fmt.Fprintln(wb, "<ul>")
+	_, _ = fmt.Fprintln(w, "<body>")
+	_, _ = fmt.Fprintln(w, "<ul>")
 
 	_ = chi.Walk(mi.Mux, func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
 		if method == http.MethodGet {
-			_, _ = fmt.Fprintf(wb, "<li>%s <a href=\"%s\">%s</a></li>", method, html.EscapeString(route), route)
+			_, _ = fmt.Fprintf(w, "<li>%s <a href=\"%s\">%s</a></li>", method, html.EscapeString(route), route)
 		} else {
-			_, _ = fmt.Fprintf(wb, "<li>%s %s</li>", method, route)
+			_, _ = fmt.Fprintf(w, "<li>%s %s</li>", method, route)
 		}
 
 		return nil
 	})
 
-	_, _ = fmt.Fprintln(wb, "</ul>")
-	_, _ = fmt.Fprintln(wb, "</body>")
-	_, _ = fmt.Fprintln(wb, "</html>")
-
-	// TODO extract etag support to middleware
-	etag := genEtag(wb.Bytes())
-	if r.Header.Get("If-None-Match") == etag {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-
-	w.Header().Set("ETag", genEtag(wb.Bytes()))
-
-	_, _ = io.Copy(w, wb)
-}
-
-func genEtag(buf []byte) string {
-	sum := sha1.Sum(buf)
-	return base64.URLEncoding.EncodeToString(sum[:])
+	_, _ = fmt.Fprintln(w, "</ul>")
+	_, _ = fmt.Fprintln(w, "</body>")
+	_, _ = fmt.Fprintln(w, "</html>")
 }
 
 func routeHandler(w http.ResponseWriter, r *http.Request) {
