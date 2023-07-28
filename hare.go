@@ -40,6 +40,16 @@ func main() {
 			&cli.BoolFlag{Name: "route-enabled", Usage: "route-enabled", Value: false, EnvVars: []string{"HARE_ROUTE_ENABLED"}, Destination: &routeEnabled},
 		},
 		Action: start,
+		Commands: []*cli.Command{
+			{
+				Name:  "ascii",
+				Usage: "Prints ASCII table",
+				Action: func(_ *cli.Context) error {
+					printAsciiTable(os.Stdout)
+					return nil
+				},
+			},
+		},
 	}
 
 	_ = app.Run(os.Args)
@@ -54,6 +64,7 @@ func start(cCtx *cli.Context) error {
 	mux.Get("/hello", helloHandler)
 	mux.Post("/body", bodyHandler)
 	mux.Get("/query", queryHandler)
+	mux.With(middleware.BodyEtag).Get("/ascii", asciiHandler)
 
 	if err := fs.WalkDir(staticFS, "static", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
