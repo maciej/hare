@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -47,15 +48,7 @@ var asciiSpecials = [32]asciiSpecial{
 	{"US", "unit separator"},
 }
 
-var longestDesc int
-
-func init() {
-	for _, s := range asciiSpecials {
-		if len(s.Description) > longestDesc {
-			longestDesc = len(s.Description)
-		}
-	}
-}
+var allowedCols = []int{1, 2, 4}
 
 func asciiCharString(i int) string {
 	switch i {
@@ -73,46 +66,81 @@ func asciiCharString(i int) string {
 	}
 }
 
-func printAsciiTable(w io.Writer) {
+func printAsciiTable(w io.Writer, columns int) {
 	const columnSpacing = 4
-	for col := 0; col < 4; col++ {
-		fmt.Fprintf(w, "HEX DEC CHAR")
-		if col == 0 {
-			fmt.Fprintf(w, strings.Repeat(" ", longestDesc+1+columnSpacing))
-		} else if col != 3 {
-			fmt.Fprintf(w, strings.Repeat(" ", columnSpacing))
+
+	var allowed bool
+	for _, col := range allowedCols {
+		if columns == col {
+			allowed = true
+			break
 		}
 	}
-	fmt.Fprintln(w)
-
-	for col := 0; col < 4; col++ {
-		fmt.Fprintf(w, "------------")
-		if col == 0 {
-			fmt.Fprintf(w, strings.Repeat(" ", longestDesc+1+columnSpacing))
-		} else if col != 3 {
-			fmt.Fprintf(w, strings.Repeat(" ", columnSpacing))
-		}
+	if !allowed {
+		panic(fmt.Sprintf("unsupported column count %d", columns))
 	}
-	fmt.Fprintln(w)
 
-	for i := 0; i < 32; i++ {
-		for col := 0; col < 4; col++ {
-			cell := i + col*32
-			ch := asciiCharString(cell)
+	rows := 128 / columns
+	columnWidths := make([]int, columns)
 
-			fmt.Fprintf(w, "%02x %3d %s", cell, cell, ch)
-			if col == 0 {
-				fmt.Fprintf(w, strings.Repeat(" ", longestDesc-len(ch)+6+columnSpacing))
-			} else if col != 3 {
-				fmt.Fprintf(w, strings.Repeat(" ", 5+columnSpacing-len(ch)))
+	header := "HEX DEC CHAR"
+	header2 := "------------"
+
+	for col := 0; col < columns; col++ {
+		for row := 0; row < rows; row++ {
+			cell := col*rows + row
+			cellLen := 7 + len(asciiCharString(cell))
+			if cellLen > columnWidths[col] {
+				columnWidths[col] = cellLen
 			}
+		}
 
+		if len(header) > columnWidths[col] {
+			columnWidths[col] = len(header)
+		}
+	}
+
+	for col := 0; col < columns; col++ {
+		fmt.Fprintf(w, header)
+		padding := columnWidths[col] - len(header) + columnSpacing
+		fmt.Fprintf(w, strings.Repeat(" ", padding))
+	}
+	fmt.Fprintln(w)
+
+	for col := 0; col < columns; col++ {
+		fmt.Fprintf(w, header2)
+		padding := columnWidths[col] - len(header2) + columnSpacing
+		fmt.Fprintf(w, strings.Repeat(" ", padding))
+	}
+	fmt.Fprintln(w)
+
+	for row := 0; row < rows; row++ {
+		for col := 0; col < columns; col++ {
+			cell := col*rows + row
+			ch := asciiCharString(cell)
+			fmt.Fprintf(w, "%02x %3d %s", cell, cell, ch)
+
+			padding := columnWidths[col] + columnSpacing - len(ch) - 7
+			fmt.Fprintf(w, strings.Repeat(" ", padding))
 		}
 		fmt.Fprintln(w)
 	}
+
 }
 
-func asciiHandler(w http.ResponseWriter, _ *http.Request) {
+func asciiHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "text/plain")
-	printAsciiTable(w)
+
+	columns := 4
+
+	if r.URL.Query().Has("m") {
+		mv := r.URL.Query().Get("m")
+		if mv == "" {
+			columns = 1
+		} else if mb, err := strconv.ParseBool(mv); err == nil && mb {
+			columns = 1
+		}
+	}
+
+	printAsciiTable(w, columns)
 }

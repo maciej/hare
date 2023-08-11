@@ -44,8 +44,11 @@ func main() {
 			{
 				Name:  "ascii",
 				Usage: "Prints ASCII table",
-				Action: func(_ *cli.Context) error {
-					printAsciiTable(os.Stdout)
+				Flags: []cli.Flag{
+					&cli.IntFlag{Name: "columns", Usage: "Table columns [1,2,4]", Value: 4},
+				},
+				Action: func(cCtx *cli.Context) error {
+					printAsciiTable(os.Stdout, cCtx.Int("columns"))
 					return nil
 				},
 			},
