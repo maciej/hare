@@ -67,6 +67,7 @@ func start(cCtx *cli.Context) error {
 	mux.Get("/hello", helloHandler)
 	mux.Post("/body", bodyHandler)
 	mux.Get("/query", queryHandler)
+	mux.Get("/query.json", queryJSONHandler)
 	mux.With(middleware.BodyEtag).Get("/ascii", asciiHandler)
 
 	if err := fs.WalkDir(staticFS, "static", func(path string, d fs.DirEntry, err error) error {
@@ -245,4 +246,10 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "text/plain")
 
 	_, _ = fmt.Fprintf(w, "%s\n", r.URL.RawQuery)
+}
+
+func queryJSONHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+
+	_ = json.NewEncoder(w).Encode(r.URL.Query())
 }
