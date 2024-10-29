@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-chi/render"
 	"hare/middleware"
 
 	"github.com/go-chi/chi/v5"
@@ -62,12 +63,14 @@ func start(cCtx *cli.Context) error {
 	mux := chi.NewMux()
 
 	mux.With(middleware.BodyEtag).Get("/", (&muxIndexer{mux}).indexHandler)
+
 	mux.Get("/headers", headersHandler)
 	mux.Get("/set-cookie", setCookieHandler)
 	mux.Get("/hello", helloHandler)
 	mux.Post("/body", bodyHandler)
 	mux.Get("/query", queryHandler)
 	mux.Get("/query.json", queryJSONHandler)
+	mux.Get("/path/*", pathHandler)
 	mux.With(middleware.BodyEtag).Get("/ascii", asciiHandler)
 
 	if err := fs.WalkDir(staticFS, "static", func(path string, d fs.DirEntry, err error) error {
@@ -100,6 +103,10 @@ func start(cCtx *cli.Context) error {
 	}
 
 	return nil
+}
+
+func pathHandler(w http.ResponseWriter, r *http.Request) {
+	render.PlainText(w, r, strings.TrimPrefix(r.URL.Path, "/path"))
 }
 
 type muxIndexer struct {

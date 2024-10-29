@@ -63,6 +63,7 @@ func GenEtag(buf []byte) string {
 	sum := sha1.Sum(buf)
 	return encEtagVal(sum[:])
 }
+
 func GenEtagFromReader(reader io.Reader) (string, error) {
 	sum := sha1.New()
 
